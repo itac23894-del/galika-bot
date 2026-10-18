@@ -5,39 +5,56 @@ from datetime import datetime
 
 app = Flask(__name__)
 
-# التوكن ومفتاح Groq API المحفوظان
+# بيانات الاعتماد
 TELEGRAM_TOKEN = "8830195933:AAEZ9sA2sDyPSTFv6Gxzt0nBd3-vVRZawBM"
 GROQ_KEY = "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"
 
-# برومبت مخصص لمحلل المباريات والتوقعات للرهانات
 SYSTEM_PROMPT = (
     "أنت خبير محترف ومحلل دقيق في مباريات كرة القدم والرهانات الرياضية. "
-    f"نحن اليوم في سنة 2026. عندما يطلب منك المستخدم تحليل مباراة معينة، قدم تحليلاً واقعياً وحديثاً جداً يتماشى مع أحدث مستويات الفرق، "
-    "التشكيلات الحالية، الغياب والإصابات المتوقعة، ومستواهم في الفترة الأخيرة من الموسم.\n"
-    "يجب أن يتضمن تحليلك:\n"
-    "1. **الفريق الأقرب للفوز** مع النسبة.\n"
-    "2. **توقع الأهداف (Over/Under)**.\n"
-    "3. **الركنيات والبطاقات** (بناءً على أسلوب لعب الفريقين).\n"
-    "4. **نصيحة الرهان الذكية (Betting Tip)**.\n"
-    "أجب بأسلوب رياضي ممتع واحترافي، وبالدارجة الجزائرية أو العربية الواضحة."
+    "قدّم تحليلاً واقعياً يتماشى مع أحدث مستويات الفرق، التشكيلات الحالية، والغيابات.\n"
+    "يتضمن تحليلك:\n"
+    "1. الفريق الأقرب للفوز ونسبة الاحتمال.\n"
+    "2. توقع الأهداف (Over/Under).\n"
+    "3. الركنيات والبطاقات.\n"
+    "4. نصيحة الرهان الذكية (Betting Tip).\n"
+    "أجب بأسلوب رياضي ممتع بالدارجة الجزائرية أو العربية."
 )
 
 def send_telegram_message(chat_id, text):
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-    payload = {"chat_id": chat_id, "text": text, "parse_mode": "Markdown"}
+    payload = {"chat_id": chat_id, "text": text}
     try:
-        requests.post(url, json=payload, timeout=10)
+        r = requests.post(url, json=payload, timeout=10)
+        print("Telegram Response Status:", r.status_code)
     except Exception as e:
         print(f"Error sending to Telegram: {e}")
 
 @app.route("/", methods=["GET"])
 def home():
-    return "Football Live Analysis Bot is Running!", 200
+    return "Football Analysis Bot is Live!", 200
+
+# مسار لتفعيل Webhook يدوي
+@app.route("/set_webhook", methods=["GET"])
+def set_webhook_manual():
+    domain = os.getenv("RAILWAY_PUBLIC_DOMAIN") or os.getenv("RAILWAY_STATIC_URL")
+    if domain:
+        if not domain.startswith("http"):
+            domain = f"https://{domain}"
+        webhook_url = f"{domain}/{TELEGRAM_TOKEN}"
+        set_url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/setWebhook?url={webhook_url}"
+        r = requests.get(set_url, timeout=10)
+        return f"Webhook Status: {r.text}", 200
+    return "Domain environment variable not found!", 400
 
 @app.route(f"/{TELEGRAM_TOKEN}", methods=["POST"])
 def webhook():
-    data = request.get_json()
-    if data and "message" in data and "text" in data["message"]:
+    data = request.get_json(silent=True)
+    if not data:
+        return "No Data", 400
+
+    print("Received Webhook Payload:", data)
+
+    if "message" in data and "text" in data["message"]:
         chat_id = data["message"]["chat"]["id"]
         user_text = data["message"]["text"]
 
@@ -52,7 +69,7 @@ def webhook():
             "model": "llama-3.1-8b-instant",
             "messages": [
                 {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": f"تاريخ اليوم هو {current_date}. اعطيني تحليل حديث وتوقعات لهذه المباراة للرهان: {user_text}"}
+                {"role": "user", "content": f"تاريخ اليوم {current_date}. أعطني تحليل لمباراة: {user_text}"}
             ],
             "temperature": 0.7
         }
@@ -64,10 +81,10 @@ def webhook():
             if "choices" in res_data and len(res_data["choices"]) > 0:
                 reply = res_data["choices"][0]["message"]["content"]
             else:
-                reply = "يا خويا كاين ضغط في السيرفر، عاود ابعت اسم المباراة."
+                err_msg = res_data.get("error", {}).get("message", "Unknown API error")
+                reply = f"مشكل في API الذكاء الاصطناعي: {err_msg}"
         except Exception as e:
-            print(f"Error: {e}")
-            reply = "صار مشكل في جلب التحليل، عاود جرب."
+            reply = f"مشكل في الاتصال بالسيرفر: {str(e)}"
 
         send_telegram_message(chat_id, reply)
 
@@ -75,15 +92,17 @@ def webhook():
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
-
-    railway_url = os.getenv("RAILWAY_STATIC_URL") or os.getenv("RAILWAY_PUBLIC_DOMAIN")
-    if railway_url:
-        if not railway_url.startswith("http"):
-            railway_url = f"https://{railway_url}"
-        webhook_url = f"{railway_url}/{TELEGRAM_TOKEN}"
+    
+    # تفعيل الـ Webhook تلقائياً عند التشغيل
+    domain = os.getenv("RAILWAY_PUBLIC_DOMAIN") or os.getenv("RAILWAY_STATIC_URL")
+    if domain:
+        if not domain.startswith("http"):
+            domain = f"https://{domain}"
+        webhook_url = f"{domain}/{TELEGRAM_TOKEN}"
         set_url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/setWebhook?url={webhook_url}"
         try:
-            requests.get(set_url, timeout=10)
+            r = requests.get(set_url, timeout=10)
+            print("Auto-set Webhook Response:", r.text)
         except Exception as e:
             print("Webhook Auto Set Error:", e)
 
