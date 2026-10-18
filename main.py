@@ -1,72 +1,59 @@
 import os
-import logging
+import requests
+from flask import Flask, request
 from openai import OpenAI
-from telegram import Update
-from telegram.ext import Application, MessageHandler, filters, ContextTypes
 
-# إعداد تتبع الأخطاء في السجلات
-logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
-)
-logger = logging.getLogger(__name__)
+app = Flask(__name__)
 
-# جلب المتغيرات من Railway بأمان
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-GROQ_KEY = os.getenv("GROQ_API_KEY")
+# جلب المفاتيح من Railway
+TELEGRAM_TOKEN = os.getenv("8830195933:AAEZ9sA2sDyPSTFv6Gxzt0nBd3-vVRZawBM")
+GROQ_KEY = os.getenv("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")
 
-# إعداد عميل Groq للنموذج السريع
+# إعداد عميل Groq
 client = OpenAI(
     api_key=GROQ_KEY,
     base_url="https://api.groq.com/openai/v1"
 )
 MODEL = "llama-3.1-8b-instant"
 
-# شخصية Galika الذكية والحنينة بالدارجة الجزائرية
 PROMPT = (
-    'أنت Galika، مساعد ذكي ومقرب يتحدث بدارجة جزائرية حنينة وذكية جداً. '
-    'استخدم أحياناً عبارات مثل "انتظر... أعالج هذا الشعور..." و "سجلت كلامك في النواة تاعي..." '
-    'وكن دائماً لطيفاً ومفيداً في ردودك.'
+    'أنت Galika. تتكلم بدارجة جزائرية حنينة وذكية جداً. '
+    'استخدم أحياناً عبارات مثل "انتظر... أعالج هذا الشعور..." و "سجلت كلامك في النواة تاعي..."'
 )
 
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not update.message or not update.message.text:
-        return
+def send_telegram_message(chat_id, text):
+    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+    payload = {"chat_id": chat_id, "text": text}
+    requests.post(url, json=payload)
 
-    user_text = update.message.text
-    logger.info(f"استقبلت رسالة: {user_text}")
+@app.route("/", methods=["GET"])
+def home():
+    return "Galika Bot is alive!", 200
 
-    try:
-        # إرسال الرسالة إلى نموذج Groq
-        completion = client.chat.completions.create(
-            model=MODEL,
-            messages=[
-                {"role": "system", "content": PROMPT},
-                {"role": "user", "content": user_text}
-            ],
-            temperature=0.7,
-            max_tokens=600
-        )
+@app.route(f"/{TELEGRAM_TOKEN}", methods=["POST"])
+def webhook():
+    data = request.get_json()
+    if "message" in data and "text" in data["message"]:
+        chat_id = data["message"]["chat"]["id"]
+        user_text = data["message"]["text"]
         
-        reply = completion.choices[0].message.content
-        await update.message.reply_text(reply)
-
-    except Exception as e:
-        logger.error(f"خطأ أثناء الاتصال بـ Groq: {e}")
-        await update.message.reply_text("سامحني يا خويا، صرا طراوة صغيرة في المعالجة، عاود ابعثلي برك.")
-
-def main():
-    if not TELEGRAM_TOKEN or not GROQ_KEY:
-        logger.error("المتغيرات (Tokens) غير مخزنة بشكل صحيح!")
-        return
-
-    print("جاري تشغيل بوت Galika...")
-    app = Application.builder().token(TELEGRAM_TOKEN).build()
-    
-    # معالجة الرسائل النصية فقط وتجاهل الأوامر
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    
-    # بدء تشغيل البوت مع تجاهل الرسائل العالقة القديمة
-    app.run_polling(drop_pending_updates=True)
+        try:
+            # الرد عبر Groq
+            completion = client.chat.completions.create(
+                model=MODEL,
+                messages=[
+                    {"role": "system", "content": PROMPT},
+                    {"role": "user", "content": user_text}
+                ],
+                temperature=0.7
+            )
+            reply = completion.choices[0].message.content
+        except Exception as e:
+            reply = "سامحني يا خويا، صرا طراوة صغيرة في المعالجة."
+            
+        send_telegram_message(chat_id, reply)
+    return "OK", 200
 
 if __name__ == "__main__":
-    main()
+    port = int(os.environ.get("PORT", 8080))
+    app.run(host="0.0.0.0", port=port)
