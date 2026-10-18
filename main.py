@@ -1,4 +1,14 @@
 import os
+import subprocess
+import sys
+
+# تثبيت المكتبات تلقائياً عند تشغيل البوت لتجنب مشاكل Railway
+try:
+    import telegram
+    import openai
+except ImportError:
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "python-telegram-bot", "openai"])
+
 from openai import OpenAI
 from telegram import Update
 from telegram.ext import Application, MessageHandler, filters, ContextTypes
