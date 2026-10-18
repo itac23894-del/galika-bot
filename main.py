@@ -4,19 +4,18 @@ from flask import Flask, request
 
 app = Flask(__name__)
 
-# 1. توكن البوت تاعك
+# توكن البوت
 TELEGRAM_TOKEN = "8830195933:AAEZ9sA2sDyPSTFv6Gxzt0nBd3-vVRZawBM"
 
-# 2. حط مفتاح Groq الجديد اللي خرجتو دوك هنا
-GROQ_KEY = "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"
+# مفتاح Groq الجديد تاعك
+GROQ_KEY = "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"
 
-# البرومبت الخاص بشخصية Galika (شاب/مراهق جزائري عفوي وذكي)
 SYSTEM_PROMPT = (
-    "أنت Galika، روبوت بشخصية شاب ومراهق جزائري عفوي وذكي جداً. "
+    "أنت Galika، بوت بشخصية شاب ومراهق جزائري عفوي وذكي جداً. "
     "تتكلم بالدارجة الجزائرية العفوية تاع الشباب والشوارع. "
-    "أسلوبك فكاهي، حنون، شوية فوضوي وممتع. "
+    "أسلوبك فكاهي، ذكي، شوية فوضوي وممتع. "
     "استخدم عبارات مثل: 'يا خويا'، 'واش راك'، 'سجلت كلامك في راسي'، 'أعالج هذا الشعور'. "
-    "جاوب دايماً بدارجة جزائرية قصيرة، متجددة ومباشرة بدون رسميات."
+    "جاوب دايماً بدارجة جزائرية قصيرة ومباشرة بدون رسميات."
 )
 
 def send_telegram_message(chat_id, text):
@@ -38,7 +37,6 @@ def webhook():
         chat_id = data["message"]["chat"]["id"]
         user_text = data["message"]["text"]
 
-        # إرسال النص للذكاء الاصطناعي (Groq Llama 3.1)
         headers = {
             "Authorization": f"Bearer {GROQ_KEY}",
             "Content-Type": "application/json"
@@ -59,11 +57,11 @@ def webhook():
             if "choices" in res_data and len(res_data["choices"]) > 0:
                 reply = res_data["choices"][0]["message"]["content"]
             else:
-                print("API Response Error:", res_data)
-                reply = "يا خويا مفتاح Groq راه فيه مشكل ولا كاين ضغط، بدل المفتاح!"
+                print("Groq API Error Detail:", res_data)
+                reply = "يا خويا كاين مشكل صغير في الاستجابة، عاود ابعتلي."
         except Exception as e:
             print(f"Network Error: {e}")
-            reply = "صرا انقطاع صغير في التلكوم، عاود ابعتلي يا خويا."
+            reply = "صرا انقطاع صغير في الاتصال، عاود جرب يا خويا."
 
         send_telegram_message(chat_id, reply)
 
@@ -72,7 +70,6 @@ def webhook():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
 
-    # تسجيل الـ Webhook تلقائياً في Railway
     railway_url = os.getenv("RAILWAY_STATIC_URL") or os.getenv("RAILWAY_PUBLIC_DOMAIN")
     if railway_url:
         if not railway_url.startswith("http"):
