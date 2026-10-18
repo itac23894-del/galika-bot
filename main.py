@@ -1,19 +1,11 @@
 import os
 import requests
 from flask import Flask, request
-from openai import OpenAI
 
 app = Flask(__name__)
 
 TELEGRAM_TOKEN = "8830195933:AAEZ9sA2sDyPSTFv6Gxzt0nBd3-vVRZawBM"
-# مفتاح Groq بديل ومجرب
 GROQ_KEY = "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"
-
-client = OpenAI(
-    api_key=GROQ_KEY,
-    base_url="https://api.groq.com/openai/v1"
-)
-MODEL = "llama-3.1-8b-instant"
 
 PROMPT = 'أنت بوت مراهق وشاب اسمك Galika. تتكلم بالدارجة الجزائرية العفوية. رد دائماً بطريقة قصيرة، فكاهية وممتعة.'
 
@@ -36,20 +28,31 @@ def webhook():
         chat_id = data["message"]["chat"]["id"]
         user_text = data["message"]["text"]
         
+        # إرسال الطلب مباشرة لـ Groq API عبر HTTP POST
         try:
-            completion = client.chat.completions.create(
-                model=MODEL,
-                messages=[
+            headers = {
+                "Authorization": f"Bearer {GROQ_KEY}",
+                "Content-Type": "application/json"
+            }
+            payload = {
+                "model": "llama-3.1-8b-instant",
+                "messages": [
                     {"role": "system", "content": PROMPT},
                     {"role": "user", "content": user_text}
                 ],
-                temperature=0.7
-            )
-            reply = completion.choices[0].message.content
+                "temperature": 0.7
+            }
+            response = requests.post("https://api.groq.com/openai/v1/chat/completions", json=payload, headers=headers, timeout=15)
+            res_data = response.json()
+            
+            if "choices" in res_data:
+                reply = res_data["choices"][0]["message"]["content"]
+            else:
+                print("Groq Error Response:", res_data)
+                reply = "يا خويا كاين ضغط في السيرفر تاع Groq، عاود جرب."
         except Exception as e:
-            # هنا طبعنا الخطأ الحقيقي في اللوجز باش نشوفوه، والبوت راح يرد بكلمة خفيفة عوض رسالة الخطأ القديمة
-            print(f"Groq API Error Detail: {e}")
-            reply = "راسك خشين يا خويا، عاود غrat (جرب) مرة أخرى!"
+            print(f"HTTP Request Error: {e}")
+            reply = "راسك خشين يا خويا، ماقدرتش نتصل بالذكاء الاصطناعي!"
             
         send_telegram_message(chat_id, reply)
     return "OK", 200
