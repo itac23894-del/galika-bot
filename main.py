@@ -4,7 +4,7 @@ from telegram import Update
 from telegram.ext import Application, MessageHandler, filters, ContextTypes
 
 # جلب التوكن والمفتاح من البيئة بأمان
-TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN", "8830195933:AAGSfxWfuLkTu_4r_0GiHpjOMdYbupR4s34")
+TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN", "8830195933:AAEZ9sA2sDyPSTFv6Gxzt0nBd3-vVRZawBM")
 OPENAI_KEY = os.environ.get("OPENAI_KEY", "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")
 
 # إعداد عميل Groq
