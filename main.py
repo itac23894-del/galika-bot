@@ -3,7 +3,7 @@ from openai import OpenAI
 from telegram import Update
 from telegram.ext import Application, MessageHandler, filters, ContextTypes
 
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "8830195933:AAGSfxWfuLkTu_4r_0GiHpjOMdYbupR4s34")
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "8830195933:AAEZ9sA2sDyPSTFv6Gxzt0nBd3-vVRZawBM")
 OPENAI_KEY = os.getenv("GROQ_API_KEY", "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")
 
 if OPENAI_KEY and OPENAI_KEY.startswith("gsk_"):
