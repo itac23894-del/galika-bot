@@ -1,26 +1,30 @@
 import os
 import requests
 from flask import Flask, request
+from datetime import datetime
 
 app = Flask(__name__)
 
-# توكن البوت
+# التوكن ومفتاح Groq API المحفوظان
 TELEGRAM_TOKEN = "8830195933:AAEZ9sA2sDyPSTFv6Gxzt0nBd3-vVRZawBM"
-
-# مفتاح Groq الجديد تاعك
 GROQ_KEY = "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"
 
+# برومبت مخصص لمحلل المباريات والتوقعات للرهانات
 SYSTEM_PROMPT = (
-    "أنت Galika، بوت بشخصية شاب ومراهق جزائري عفوي وذكي جداً. "
-    "تتكلم بالدارجة الجزائرية العفوية تاع الشباب والشوارع. "
-    "أسلوبك فكاهي، ذكي، شوية فوضوي وممتع. "
-    "استخدم عبارات مثل: 'يا خويا'، 'واش راك'، 'سجلت كلامك في راسي'، 'أعالج هذا الشعور'. "
-    "جاوب دايماً بدارجة جزائرية قصيرة ومباشرة بدون رسميات."
+    "أنت خبير محترف ومحلل دقيق في مباريات كرة القدم والرهانات الرياضية. "
+    f"نحن اليوم في سنة 2026. عندما يطلب منك المستخدم تحليل مباراة معينة، قدم تحليلاً واقعياً وحديثاً جداً يتماشى مع أحدث مستويات الفرق، "
+    "التشكيلات الحالية، الغياب والإصابات المتوقعة، ومستواهم في الفترة الأخيرة من الموسم.\n"
+    "يجب أن يتضمن تحليلك:\n"
+    "1. **الفريق الأقرب للفوز** مع النسبة.\n"
+    "2. **توقع الأهداف (Over/Under)**.\n"
+    "3. **الركنيات والبطاقات** (بناءً على أسلوب لعب الفريقين).\n"
+    "4. **نصيحة الرهان الذكية (Betting Tip)**.\n"
+    "أجب بأسلوب رياضي ممتع واحترافي، وبالدارجة الجزائرية أو العربية الواضحة."
 )
 
 def send_telegram_message(chat_id, text):
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-    payload = {"chat_id": chat_id, "text": text}
+    payload = {"chat_id": chat_id, "text": text, "parse_mode": "Markdown"}
     try:
         requests.post(url, json=payload, timeout=10)
     except Exception as e:
@@ -28,7 +32,7 @@ def send_telegram_message(chat_id, text):
 
 @app.route("/", methods=["GET"])
 def home():
-    return "Galika AI is Running!", 200
+    return "Football Live Analysis Bot is Running!", 200
 
 @app.route(f"/{TELEGRAM_TOKEN}", methods=["POST"])
 def webhook():
@@ -41,27 +45,29 @@ def webhook():
             "Authorization": f"Bearer {GROQ_KEY}",
             "Content-Type": "application/json"
         }
+        
+        current_date = datetime.now().strftime("%Y-%m-%d")
+        
         payload = {
             "model": "llama-3.1-8b-instant",
             "messages": [
                 {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": user_text}
+                {"role": "user", "content": f"تاريخ اليوم هو {current_date}. اعطيني تحليل حديث وتوقعات لهذه المباراة للرهان: {user_text}"}
             ],
-            "temperature": 0.8
+            "temperature": 0.7
         }
 
         try:
-            res = requests.post("https://api.groq.com/openai/v1/chat/completions", json=payload, headers=headers, timeout=12)
+            res = requests.post("https://api.groq.com/openai/v1/chat/completions", json=payload, headers=headers, timeout=15)
             res_data = res.json()
             
             if "choices" in res_data and len(res_data["choices"]) > 0:
                 reply = res_data["choices"][0]["message"]["content"]
             else:
-                print("Groq API Error Detail:", res_data)
-                reply = "يا خويا كاين مشكل صغير في الاستجابة، عاود ابعتلي."
+                reply = "يا خويا كاين ضغط في السيرفر، عاود ابعت اسم المباراة."
         except Exception as e:
-            print(f"Network Error: {e}")
-            reply = "صرا انقطاع صغير في الاتصال، عاود جرب يا خويا."
+            print(f"Error: {e}")
+            reply = "صار مشكل في جلب التحليل، عاود جرب."
 
         send_telegram_message(chat_id, reply)
 
