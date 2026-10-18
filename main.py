@@ -4,7 +4,7 @@ import telebot
 from datetime import datetime, timedelta
 
 TELEGRAM_TOKEN = os.getenv("8830195933:AAHhXpc5F_a392CEwpLd5dOPSpas9KY17Y0")
-GROQ_KEY = os.getenv("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")
+GROQ_KEY = os.getenv("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")
 
 if not TELEGRAM_TOKEN or not GROQ_KEY:
     print("خطأ: لازم تحط TELEGRAM_TOKEN و GROQ_KEY في Variables!")
