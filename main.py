@@ -5,9 +5,9 @@ from openai import OpenAI
 
 app = Flask(__name__)
 
-# جلب المفاتيح من Railway
-TELEGRAM_TOKEN = os.getenv("8830195933:AAEZ9sA2sDyPSTFv6Gxzt0nBd3-vVRZawBM")
-GROQ_KEY = os.getenv("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")
+# التوكنات والمفاتيح مباشرة
+TELEGRAM_TOKEN = "8830195933:AAEZ9sA2sDyPSTFv6Gxzt0nBd3-vVRZawBM"
+GROQ_KEY = "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"
 
 # إعداد عميل Groq
 client = OpenAI(
@@ -33,7 +33,7 @@ def home():
 @app.route(f"/{TELEGRAM_TOKEN}", methods=["POST"])
 def webhook():
     data = request.get_json()
-    if "message" in data and "text" in data["message"]:
+    if data and "message" in data and "text" in data["message"]:
         chat_id = data["message"]["chat"]["id"]
         user_text = data["message"]["text"]
         
