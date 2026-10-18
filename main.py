@@ -3,30 +3,31 @@ import requests
 import telebot
 from datetime import datetime, timedelta
 
-# ==================== المفاتيح والتوكنات ====================
+# ==================== التوكنات ====================
 TELEGRAM_TOKEN = "8830195933:AAEZ9sA2sDyPSTFv6Gxzt0nBd3-vVRZawBM"
-GROQ_KEY = "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"
-
 bot = telebot.TeleBot(TELEGRAM_TOKEN)
+
 FAILED_COINS = {}
 
-# ==================== كلاس جارفيس الأسطوري (7 في 1) ====================
+# ==================== كلاس جارفيس الأسطوري ====================
 class JarvisLegendary:
-    
+    # سلاح 1: عين الحوت 🐋
     def whale_eye(self, symbol, volume_spike):
         if volume_spike > 5: return 30, "🐋 دخول حوت ضخم x5"
         if volume_spike > 3: return 20, "🐋 حيتان بداو يدخلو"
         return 0, "لا يوجد حيتان"
 
+    # سلاح 2: أنف الأخبار 👃
     def news_nose(self, symbol):
         try:
             url = f"https://api.coingecko.com/api/v3/coins/{symbol.lower()}"
             headers = {"User-Agent": "Mozilla/5.0"}
             requests.get(url, headers=headers, timeout=3)
-            return 15, "👃 لا اخبار سلبية - آمن"
+            return 15, "👃 لا أخبار سلبية - آمن"
         except:
             return 10, "👃 الأخبار هادئة"
 
+    # سلاح 3: عقل الشارت 🧠
     def chart_brain(self, rsi, price_change):
         score = 0
         reasons = []
@@ -41,12 +42,19 @@ class JarvisLegendary:
             reasons.append("🧠 فات الحال - طلعت بزاف")
         return score, reasons
 
+    # سلاح 4: درع الفخ 🛡️
     def trap_shield(self, symbol):
         if symbol in FAILED_COINS:
             if datetime.now() - FAILED_COINS[symbol] < timedelta(hours=24):
                 return False, "🛡️ عملة فشلت البارح"
         return True, "🛡️ آمنة"
 
+    # سلاح 5: ذاكرة المعركة 📝
+    def battle_memory(self, symbol, success):
+        if not success:
+            FAILED_COINS[symbol] = datetime.now()
+
+    # سلاح 6 و 7: محرك الأهداف + وضع القناص 🎯
     def sniper_engine(self, price, score):
         if score >= 85:
             t1 = price * 1.12
@@ -57,14 +65,14 @@ class JarvisLegendary:
         else:
             t1 = price * 1.05
             t2 = price * 1.09
-
         sl = price * 0.96
         return price, t1, t2, sl
 
+    # ===== التحليل الأسطوري الكامل =====
     def get_legendary_alert(self, symbol, price, volume_spike, rsi, price_change):
         is_safe, shield_msg = self.trap_shield(symbol)
         if not is_safe:
-            return None, f"⚠️ **تنبيه:** العملة `{symbol}` غير آمنة حالياً ({shield_msg})"
+            return f"⚠️ **تحذير جارفيس:** العملة {symbol} غير آمنة حالياً ({shield_msg})"
 
         total_score = 0
         all_reasons = [shield_msg]
@@ -86,20 +94,21 @@ class JarvisLegendary:
         report = f"""
 🚀 **جارفيس الأسطوري: {symbol.upper()}**
 
-💰 **دخول:** `{entry:.8f}`
+💰 **سعر الدخول:** `{entry:.8f}`
 🎯 **هدف 1:** `{t1:.8f}`
 🎯 **هدف 2:** `{t2:.8f}`
-🛑 **ستوب:** `{sl:.8f}`
+🛑 **ستوب لوس:** `{sl:.8f}`
 
 📊 **تحليل 7 أسلحة:**
 {chr(10).join(all_reasons)}
 
-🔥 **الثقة الأسطورية:** `{total_score}%`
+🔥 **نسبة الثقة الأسطورية:** {total_score}%
 """
-        return total_score, report
+        return report
 
 jarvis = JarvisLegendary()
 
+# ==================== جلب البيانات التلقائي من Binance ====================
 def fetch_binance_data(symbol):
     symbol_usdt = f"{symbol.upper()}USDT"
     headers = {
@@ -107,32 +116,31 @@ def fetch_binance_data(symbol):
     }
     try:
         ticker_url = f"https://api.binance.com/api/v3/ticker/24hr?symbol={symbol_usdt}"
-        res = requests.get(ticker_url, headers=headers, timeout=8)
-        ticker_res = res.json()
+        ticker_res = requests.get(ticker_url, headers=headers, timeout=5).json()
         
-        if not isinstance(ticker_res, dict) or "lastPrice" not in ticker_res:
+        if "lastPrice" not in ticker_res:
             return None
 
         price = float(ticker_res["lastPrice"])
         price_change = float(ticker_res["priceChangePercent"])
 
         klines_url = f"https://api.binance.com/api/v3/klines?symbol={symbol_usdt}&interval=1h&limit=15"
-        klines_res = requests.get(klines_url, headers=headers, timeout=8).json()
+        klines = requests.get(klines_url, headers=headers, timeout=5).json()
         
-        if isinstance(klines_res, list) and len(klines_res) > 1:
-            closes = [float(k[4]) for k in klines_res]
-            gains = [max(0, closes[i] - closes[i-1]) for i in range(1, len(closes))]
-            losses = [max(0, closes[i-1] - closes[i]) for i in range(1, len(closes))]
-            
-            avg_gain = sum(gains) / len(gains) if gains else 0
-            avg_loss = sum(losses) / len(losses) if losses else 0
-            
-            rsi = 100 if avg_loss == 0 else 100 - (100 / (1 + (avg_gain / avg_loss)))
+        closes = [float(k[4]) for k in klines]
+        gains = [max(0, closes[i] - closes[i-1]) for i in range(1, len(closes))]
+        losses = [max(0, closes[i-1] - closes[i]) for i in range(1, len(closes))]
+        
+        avg_gain = sum(gains) / len(gains) if gains else 0
+        avg_loss = sum(losses) / len(losses) if losses else 0
+        
+        if avg_loss == 0:
+            rsi = 100
         else:
-            rsi = 60.0
+            rs = avg_gain / avg_loss
+            rsi = 100 - (100 / (1 + rs))
 
-        quote_vol = float(ticker_res.get("quoteVolume", 0))
-        volume_spike = round((quote_vol / 10000000) % 6 + 1, 2) if quote_vol > 0 else 2.5
+        volume_spike = round((float(ticker_res.get("quoteVolume", 0)) / 10000000) % 6 + 1, 2)
 
         return {
             "price": price,
@@ -141,51 +149,28 @@ def fetch_binance_data(symbol):
             "volume_spike": volume_spike
         }
     except Exception as e:
-        print(f"Binance Fetch Error for {symbol}: {e}")
+        print(f"Error fetching Binance data: {e}")
         return None
 
-def generate_ai_advice(symbol, score, report):
-    headers = {
-        "Authorization": f"Bearer {GROQ_KEY}",
-        "Content-Type": "application/json"
-    }
-    prompt = f"""
-أنت خبير تداول عملات رقمية اسمه 'جارفيس'. بناءً على التقرير التالي لعملة {symbol}:
-{report}
-نسبة الثقة: {score}%
-قدم نصيحة سريعة للتداول بالدارجة الجزائرية بأسلوب ذكي ومشجع.
-    """
-    payload = {
-        "model": "llama-3.1-8b-instant",
-        "messages": [{"role": "user", "content": prompt}],
-        "temperature": 0.7
-    }
-    try:
-        res = requests.post("https://api.groq.com/openai/v1/chat/completions", json=payload, headers=headers, timeout=10)
-        res_data = res.json()
-        if "choices" in res_data and len(res_data["choices"]) > 0:
-            return res_data["choices"][0]["message"]["content"]
-    except Exception as e:
-        print(f"Groq AI Error: {e}")
-    return "💡 **نصيحة جارفيس:** اتبع الأهداف ووقف الخسارة بدقة!"
-
+# ==================== أوامر التيليجرام ====================
 @bot.message_handler(commands=['start', 'help'])
 def send_welcome(message):
-    bot.reply_to(message, "⚡ **مرحباً بك في بوت جارفيس الأسطوري (7 في 1)!**\n\nأرسل لي رمز أي عملة (مثل: `BNB`, `BTC`, `PEPE`) وسأعطيك التحليل فوراً!")
+    bot.reply_to(message, "⚡ **مرحباً بك في بوت جارفيس الأسطوري (7 في 1)!**\n\nأرسل لي رمز أي عملة (مثال: `BTC`, `PEPE`, `BNB`) وسأقوم بمسح الشارت بـ 7 أسلحة وإعطائك النتيجة فوراً!")
 
 @bot.message_handler(func=lambda message: True)
-def handle_message(message):
+def analyze_crypto(message):
     symbol = message.text.strip().replace("$", "").upper()
     chat_id = message.chat.id
 
-    bot.send_message(chat_id, f"🔍 **جاري فحص {symbol} عبر أسلحة جارفيس...**")
+    bot.send_message(chat_id, f"🔍 **جاري فحص عملة {symbol} بأسلحة جارفيس الـ 7 عبر Binance...**")
 
     data = fetch_binance_data(symbol)
+    
     if not data:
-        bot.send_message(chat_id, f"❌ عذراً، تعذر جلب بيانات العملة `{symbol}` من Binance.")
+        bot.send_message(chat_id, f"❌ تعذر العثور على العملة `{symbol}` في منصة Binance. تأكد من الرمز وإعادة المحاولة.")
         return
 
-    score, report = jarvis.get_legendary_alert(
+    report = jarvis.get_legendary_alert(
         symbol=symbol,
         price=data["price"],
         volume_spike=data["volume_spike"],
@@ -193,16 +178,11 @@ def handle_message(message):
         price_change=data["price_change"]
     )
 
-    if report and score:
-        ai_advice = generate_ai_advice(symbol, score, report)
-        final_message = f"{report}\n🤖 **رأي جارفيس:**\n{ai_advice}"
-        bot.send_message(chat_id, final_message, parse_mode="Markdown")
-    else:
-        bot.send_message(chat_id, f"⚠️ العملة `{symbol}` لم تتخطَ عتبة الحماية الشروط حالياً.")
+    bot.send_message(chat_id, report, parse_mode="Markdown")
 
+# ==================== التشغيل النظيف بدون أخطاء 409 ====================
 if __name__ == "__main__":
-    print("Jarvis Bot is starting cleanly...")
-    # قتل أي Webhook قديم أو اتصالات معلقة لكي لا يحدث تضارب 409
+    print("Jarvis Legendary Bot is running cleanly...")
     try:
         bot.delete_webhook(drop_pending_updates=True)
     except Exception as e:
